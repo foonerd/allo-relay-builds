@@ -1,0 +1,43 @@
+# Build outputs - ignore binaries by default
+out/armv6/fn-rattenu
+out/armv6/fn-rattenuc
+out/armhf/fn-rattenu
+out/armhf/fn-rattenuc
+out/arm64/fn-rattenu
+out/arm64/fn-rattenuc
+out/amd64/fn-rattenu
+out/amd64/fn-rattenuc
+
+# Keep output directories
+!out/armv6/.gitkeep
+!out/armhf/.gitkeep
+!out/arm64/.gitkeep
+!out/amd64/.gitkeep
+
+# Keep built binaries for distribution
+!out/armv6/fn-rattenu
+!out/armv6/fn-rattenuc
+!out/armhf/fn-rattenu
+!out/armhf/fn-rattenuc
+!out/arm64/fn-rattenu
+!out/arm64/fn-rattenuc
+!out/amd64/fn-rattenu
+!out/amd64/fn-rattenuc
+
+# Temporary build directories
+build/
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Object files
+*.o
+*.a
