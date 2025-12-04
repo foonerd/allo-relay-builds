@@ -1,15 +1,21 @@
 FROM arm32v7/debian:bookworm
 
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/bookworm-backports.list
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
     build-essential \
-    gcc \
-    make \
+    gcc-arm-linux-gnueabihf \
+    g++-arm-linux-gnueabihf \
+    devscripts \
+    fakeroot \
+    debhelper \
     pkg-config \
     liblircclient-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# lgpio library will be installed at runtime via mounted DEBs
+RUN sed -i "s/doit(\"cp\", '--reflink=auto', \"-a\"/doit(\"cp\", '--reflink=auto', \"-a\", \"--no-preserve=ownership\"/g" /usr/bin/dh_install
+RUN sed -i "s/xargs(\\\@srcs, \"cp\", '--reflink=auto', \"-a\"/xargs(\\\@srcs, \"cp\", '--reflink=auto', \"-a\", \"--no-preserve=ownership\"/g" /usr/bin/dh_install
 
 WORKDIR /build

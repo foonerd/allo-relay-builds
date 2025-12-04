@@ -1,31 +1,10 @@
-# Build outputs - ignore binaries by default
-out/armv6/fn-rattenu
-out/armv6/fn-rattenuc
-out/armhf/fn-rattenu
-out/armhf/fn-rattenuc
-out/arm64/fn-rattenu
-out/arm64/fn-rattenuc
-out/amd64/fn-rattenu
-out/amd64/fn-rattenuc
-
-# Keep output directories
-!out/armv6/.gitkeep
-!out/armhf/.gitkeep
-!out/arm64/.gitkeep
-!out/amd64/.gitkeep
-
-# Keep built binaries for distribution
-!out/armv6/fn-rattenu
-!out/armv6/fn-rattenuc
-!out/armhf/fn-rattenu
-!out/armhf/fn-rattenuc
-!out/arm64/fn-rattenu
-!out/arm64/fn-rattenuc
-!out/amd64/fn-rattenu
-!out/amd64/fn-rattenuc
-
 # Temporary build directories
 build/
+out/**/*.deb
+out/**/*.buildinfo
+out/**/*.changes
+*.o
+*.a
 
 # Editor files
 *.swp
@@ -38,6 +17,9 @@ build/
 .DS_Store
 Thumbs.db
 
-# Object files
-*.o
-*.a
+# Keep built DEBs for distribution
+!out/armv6/foonerd-rattenu*.deb
+!out/armhf/foonerd-rattenu*.deb
+!out/arm64/foonerd-rattenu*.deb
+!out/amd64/foonerd-rattenu*.deb
+

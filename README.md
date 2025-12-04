@@ -1,177 +1,83 @@
 # allo-relay-builds
 
-Docker-based cross-compilation build system for Allo Relay Attenuator binaries.
-
-Produces statically linked binaries for Volumio plugin integration.
+Docker-based build system for Allo Relay Attenuator binaries targeting Volumio 4.x (Bookworm).
 
 ## Overview
 
-The Allo Relay Attenuator is a high-quality relay-based volume control for
-audiophile applications. This build system produces binaries compatible with
-Raspberry Pi OS Bookworm and Volumio 4.x.
+Builds fn-rattenu (daemon) and fn-rattenuc (client) binaries for Allo Relay Volume Attenuator hardware.
+Ported from WiringPi to lgpio for Raspberry Pi OS Bookworm compatibility.
 
-- **Hardware**: Allo Relay Attenuator board
-- **Interface**: I2C (addresses 0x20 switch, 0x21 relay)
-- **Volume range**: 0-63 (6-bit)
-- **Optional**: LIRC IR remote support
+## Output Package
 
-## Output
+- foonerd-rattenu - Contains fn-rattenu daemon and fn-rattenuc client
 
-Builds produce two binaries for each architecture:
+## Prerequisites
 
-| Binary | Description |
-|--------|-------------|
-| fn-rattenu | Relay attenuator daemon (I2C control, optional LIRC) |
-| fn-rattenuc | Client utility (get/set volume and mute) |
+1. Docker with buildx and QEMU for cross-compilation
+2. Built lgpio DEBs from lgpio-builds repository
 
-Supported architectures:
+## Build Commands
 
-| Architecture | Platform | Notes |
-|--------------|----------|-------|
-| armv6 | Pi Zero/1 | ARMv6 optimized |
-| armhf | Pi 2/3 | ARMv7 with NEON |
-| arm64 | Pi 4/5 | ARMv8-A |
-| amd64 | x86_64 | For testing |
-
-## Requirements
-
-- Docker with multi-architecture support (buildx)
-- QEMU for cross-architecture emulation
-- lgpio-builds DEBs (sibling repository)
-
-Setup on Debian/Ubuntu:
+Build all architectures for Volumio:
 ```bash
-sudo apt-get install docker.io qemu-user-static binfmt-support
-sudo systemctl enable --now docker
-```
-
-## Dependencies
-
-Before building, you need lgpio DEBs from the lgpio-builds repository:
-
-```
-../lgpio-builds/
-  out/
-    armv6/libfn-lgpio*.deb
-    armhf/libfn-lgpio*.deb
-    arm64/libfn-lgpio*.deb
-    amd64/libfn-lgpio*.deb
-```
-
-Build lgpio first:
-```bash
-cd ../lgpio-builds
-./build-matrix.sh
-```
-
-## Building
-
-Build all architectures:
-```bash
-./build-matrix.sh --lgpio=../lgpio-builds
-```
-
-Build single architecture:
-```bash
-./docker/run-docker-rattenu.sh arm64 --lgpio=../lgpio-builds
-./docker/run-docker-rattenu.sh armhf --lgpio=../lgpio-builds --verbose
+./build-matrix.sh --lgpio=../lgpio-builds --volumio
 ```
 
 Build without LIRC support:
 ```bash
-./build-matrix.sh --lgpio=../lgpio-builds --no-lirc
+./build-matrix.sh --lgpio=../lgpio-builds --volumio --no-lirc
 ```
 
-## Output Structure
+Build single architecture:
+```bash
+./scripts/extract.sh
+./docker/run-docker-rattenu.sh rattenu arm64 volumio --verbose --lgpio=../lgpio-builds
+```
 
+## Output Files
+
+With --volumio flag:
 ```
-out/
-  armv6/
-    fn-rattenu
-    fn-rattenuc
-  armhf/
-    fn-rattenu
-    fn-rattenuc
-  arm64/
-    fn-rattenu
-    fn-rattenuc
-  amd64/
-    fn-rattenu
-    fn-rattenuc
+out/armv6/foonerd-rattenu_2.0.0-1_arm.deb
+out/armhf/foonerd-rattenu_2.0.0-1_armv7.deb
+out/arm64/foonerd-rattenu_2.0.0-1_armv8.deb
+out/amd64/foonerd-rattenu_2.0.0-1_x64.deb
 ```
+
+## Architecture Mapping
+
+| Build Arch | Docker Platform | Volumio Suffix |
+|------------|-----------------|----------------|
+| armv6      | linux/arm/v7    | _arm.deb       |
+| armhf      | linux/arm/v7    | _armv7.deb     |
+| arm64      | linux/arm64     | _armv8.deb     |
+| amd64      | linux/amd64     | _x64.deb       |
 
 ## Binary Usage
 
-### fn-rattenu (daemon)
-
+Daemon:
 ```bash
-# Run with LIRC support
-fn-rattenu -d
-
-# Run without LIRC (hardware buttons only)
-fn-rattenu -d -l
-
-# Options:
-#   -d          Run as daemon
-#   -l          Disable LIRC (run without IR remote)
-#   -n name     Program name for lircrc matching
-#   -c config   LIRC config file path
-#   -h          Help
-#   -v          Version
+fn-rattenu -d              # Run as daemon with LIRC
+fn-rattenu -d -l           # Run without LIRC
+fn-rattenu -d -n myname    # Custom LIRC program name
+fn-rattenu -d -c /path     # Custom LIRC config path
 ```
 
-### fn-rattenuc (client)
-
+Client:
 ```bash
-# Get current volume (0-63)
-fn-rattenuc -c GET_VOLUME
-
-# Set volume
-fn-rattenuc -c SET_VOLUME=32
-
-# Get mute status (0=unmuted, 1=muted)
-fn-rattenuc -c GET_MUTE
-
-# Set mute
-fn-rattenuc -c SET_MUTE=1    # mute
-fn-rattenuc -c SET_MUTE=0    # unmute
+fn-rattenuc -c GET_VOLUME        # Returns 0-63
+fn-rattenuc -c SET_VOLUME=32     # Set volume
+fn-rattenuc -c GET_MUTE          # Returns 0 or 1
+fn-rattenuc -c SET_MUTE=1        # Mute
 ```
 
-## Hardware Configuration
+## Hardware Requirements
 
-The relay attenuator uses I2C bus 1:
-- Switch input: address 0x20
-- Relay output: address 0x21
-- GPIO interrupt: pin 5 (BCM)
-
-Ensure I2C is enabled in `/boot/config.txt`:
-```
-dtparam=i2c_arm=on
-```
-
-## Volumio Plugin Integration
-
-The binaries are designed for use with the Volumio relay attenuator plugin:
-
-```
-/data/plugins/miscellanea/allo_relay_volume_attenuator/
-  fn-rattenu
-  fn-rattenuc
-  setvolume.sh
-  getvolume.sh
-  setmute.sh
-  getmute.sh
-```
-
-## Cleaning
-
-Remove all build artifacts:
-```bash
-./clean-all.sh
-```
+- Allo Relay Attenuator board
+- I2C enabled (dtparam=i2c_arm=on in /boot/config.txt)
+- I2C addresses: 0x20 (switch), 0x21 (relay)
+- GPIO BCM 5 for button interrupt
 
 ## License
 
-Build scripts: MIT License
-Original relay code: Based on Allo RelayAttenuator
-lgpio library: Public Domain (joan2937)
+MIT License. Original sources by Allo.com. lgpio is public domain.
