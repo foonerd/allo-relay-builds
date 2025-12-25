@@ -164,8 +164,8 @@ static int ra_read(int handle)
 
 static void ra_write(int handle, unsigned short data)
 {
-    /* Write 0x3f first to avoid noise (from original code) */
-    lgI2cWriteByte(handle, 0x3f);
+    /* Write 0x7f first to reduce relay switching noise (quietest, not muted) */
+    lgI2cWriteByte(handle, 0x7f);
     usleep(600);
 
     if (lgI2cWriteByte(handle, data) < 0) {
@@ -181,7 +181,7 @@ static int ra_set_mute(int data)
     pthread_mutex_lock(&vol_mutex);
     if ((data == 0) || (data == 1)) {
         mute = data;
-        ra_write(relay_handle, (mute ? 0 : (~vol) | 0x40));
+        ra_write(relay_handle, (mute ? 0 : ((MAX_VOL - vol) | 0x40)));
         pthread_mutex_unlock(&vol_mutex);
         return 0;
     }
@@ -198,7 +198,7 @@ static void ra_mute_toggle(void)
 {
     pthread_mutex_lock(&vol_mutex);
     mute = (~mute) & 0x1;
-    ra_write(relay_handle, (mute ? (~vol) & 0xbf : (~vol) | 0x40));
+    ra_write(relay_handle, (mute ? 0 : ((MAX_VOL - vol) | 0x40)));
     pthread_mutex_unlock(&vol_mutex);
 }
 
@@ -210,7 +210,7 @@ static int ra_vol_inc(void)
         return 1;
     }
     vol += 1;
-    ra_write(relay_handle, ((~vol) | 0x40));
+    ra_write(relay_handle, ((MAX_VOL - vol) | 0x40));
     save_vol(vol);
     mute = 0;
     pthread_mutex_unlock(&vol_mutex);
@@ -225,7 +225,7 @@ static int ra_vol_dec(void)
         return 1;
     }
     vol -= 1;
-    ra_write(relay_handle, ((~vol) | 0x40));
+    ra_write(relay_handle, ((MAX_VOL - vol) | 0x40));
     save_vol(vol);
     mute = 0;
     pthread_mutex_unlock(&vol_mutex);
@@ -237,7 +237,7 @@ static int ra_vol_set(int data)
     pthread_mutex_lock(&vol_mutex);
     if ((data >= 0) && (data <= MAX_VOL)) {
         vol = data;
-        ra_write(relay_handle, ((~vol) | 0x40));
+        ra_write(relay_handle, ((MAX_VOL - vol) | 0x40));
         save_vol(vol);
         mute = 0;
         pthread_mutex_unlock(&vol_mutex);
