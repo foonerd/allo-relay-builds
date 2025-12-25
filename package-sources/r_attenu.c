@@ -45,11 +45,11 @@
 /* Version */
 #define R_ATTENU_VERSION "2.0.0"
 
-/* GPIO and I2C configuration */
-#define INT_GPIO        5       /* BCM GPIO pin for button interrupt */
+/* I2C configuration */
 #define I2C_BUS         1       /* I2C bus number */
 #define SWITCH_ADDR     0x20    /* I2C address for button switch */
 #define RELAY_ADDR      0x21    /* I2C address for relay attenuator */
+#define POLL_INTERVAL_MS 50     /* Button polling interval in milliseconds */
 
 /* Volume configuration */
 #define DEFAULT_VOL     0x1f    /* Default volume (0-63) */
@@ -95,10 +95,13 @@ static unsigned char mute   = 0x00;
 static bool ir_Enable       = true;
 
 /* lgpio handles */
-static int gpio_handle      = -1;
 static int switch_handle    = -1;
 static int relay_handle     = -1;
 static int socket_fd        = -1;
+
+/* Button polling */
+static pthread_t poll_thread;
+static unsigned char last_btn_state = 0xff;
 
 #ifndef NO_LIRC
 static struct lirc_config *lirc_cfg = NULL;
@@ -288,19 +291,43 @@ static void process_button_event(void)
 }
 
 /*
- * GPIO alert callback for button interrupt
+ * Button polling thread
  */
-static void gpio_alert_callback(int num_alerts, lgGpioAlert_p alerts, void *userdata)
+static void *button_poll_thread(void *arg)
 {
-    int i;
-    (void)userdata;
+    int sw_status;
+    (void)arg;
 
-    for (i = 0; i < num_alerts; i++) {
-        if (alerts[i].report.level == 0) {
-            /* Falling edge - button pressed */
-            process_button_event();
+    /* Initialize PCF8574 with all pins high (enable pull-ups) */
+    lgI2cWriteByte(switch_handle, 0xff);
+    last_btn_state = 0xff;
+
+    while (!end_program) {
+        usleep(POLL_INTERVAL_MS * 1000);
+
+        sw_status = lgI2cReadByte(switch_handle);
+        if (sw_status < 0)
+            continue;
+
+        /* Detect button press (falling edge on any bit) */
+        if (sw_status != last_btn_state) {
+            unsigned char pressed = last_btn_state & ~sw_status;
+
+            if (pressed & 0x01)
+                ra_vol_inc();
+            if (pressed & 0x02)
+                ra_vol_dec();
+            if (pressed & 0x04) {
+                /* Play/Pause - only functional with LIRC */
+            }
+            if (pressed & 0x08)
+                ra_mute_toggle();
+
+            last_btn_state = sw_status;
         }
     }
+
+    return NULL;
 }
 
 /*
@@ -515,14 +542,6 @@ static int init_hardware(void)
 {
     int ret;
 
-    /* Open GPIO chip */
-    gpio_handle = lgGpiochipOpen(0);
-    if (gpio_handle < 0) {
-        fprintf(stderr, "Error: Unable to open GPIO chip: %s\n",
-                lguErrorText(gpio_handle));
-        return EXIT_FAILURE;
-    }
-
     /* Open I2C for switch (buttons) */
     switch_handle = lgI2cOpen(I2C_BUS, SWITCH_ADDR, 0);
     if (switch_handle < 0) {
@@ -543,18 +562,11 @@ static int init_hardware(void)
     vol = retrieve_vol();
     ra_vol_set(vol);
 
-    /* Set up GPIO alert for button interrupt */
-    ret = lgGpioClaimAlert(gpio_handle, 0, LG_FALLING_EDGE, INT_GPIO, -1);
-    if (ret < 0) {
-        fprintf(stderr, "Error: Unable to claim GPIO %d for alert: %s\n",
-                INT_GPIO, lguErrorText(ret));
-        return EXIT_FAILURE;
-    }
-
-    ret = lgGpioSetAlertsFunc(gpio_handle, INT_GPIO, gpio_alert_callback, NULL);
-    if (ret < 0) {
-        fprintf(stderr, "Error: Unable to set GPIO alert callback: %s\n",
-                lguErrorText(ret));
+    /* Start button polling thread */
+    ret = pthread_create(&poll_thread, NULL, button_poll_thread, NULL);
+    if (ret != 0) {
+        fprintf(stderr, "Error: Failed to create button polling thread: %s\n",
+                strerror(ret));
         return EXIT_FAILURE;
     }
 
@@ -574,6 +586,9 @@ static void cleanup(void)
 {
     save_vol(vol);
 
+    /* Wait for polling thread to exit */
+    pthread_join(poll_thread, NULL);
+
 #ifndef NO_LIRC
     if (ir_Enable && lirc_cfg != NULL) {
         lirc_freeconfig(lirc_cfg);
@@ -590,8 +605,6 @@ static void cleanup(void)
         lgI2cClose(relay_handle);
     if (switch_handle >= 0)
         lgI2cClose(switch_handle);
-    if (gpio_handle >= 0)
-        lgGpiochipClose(gpio_handle);
 }
 
 int main(int argc, char *argv[])
