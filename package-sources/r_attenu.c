@@ -43,7 +43,7 @@
 #endif
 
 /* Version */
-#define R_ATTENU_VERSION "2.0.0"
+#define R_ATTENU_VERSION "2.0.1"
 
 /* I2C configuration */
 #define I2C_BUS         1       /* I2C bus number */
@@ -318,7 +318,10 @@ static void *button_poll_thread(void *arg)
             if (pressed & 0x02)
                 ra_vol_dec();
             if (pressed & 0x04) {
-                /* Play/Pause - only functional with LIRC */
+                /* Play/Pause - call Volumio if available */
+                if (access("/usr/local/bin/volumio", X_OK) == 0) {
+                    system("/usr/local/bin/volumio toggle");
+                }
             }
             if (pressed & 0x08)
                 ra_mute_toggle();

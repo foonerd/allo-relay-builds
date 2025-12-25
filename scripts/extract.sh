@@ -148,6 +148,15 @@ echo "10" > debian/compat
 
 # Create changelog
 cat > debian/changelog << 'EOF'
+foonerd-rattenu (2.0.1-1) bookworm; urgency=medium
+
+  * Replace GPIO interrupt with polling-based button detection
+  * Works on all Pi variants regardless of GPIO chip number
+  * Add play/pause button support via volumio toggle command
+  * Graceful handling when volumio binary not available
+
+ -- fooNerd (Just a Nerd) <nerd@foonerd.com>  Wed, 25 Dec 2024 16:00:00 +0000
+
 foonerd-rattenu (2.0.0-1) bookworm; urgency=medium
 
   * Initial fooNerd release
